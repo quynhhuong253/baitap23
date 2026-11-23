@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bài tập 23 - Game Kiểm Tra Tốc Độ Phản Xạ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      color: #ffffff;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      padding: 20px;
+    }
+
+    .student-info {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      padding: 10px 24px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 0.95rem;
+    }
+    .student-info strong { color: #38bdf8; }
+
+    h1 { font-size: 1.65rem; margin-bottom: 14px; color: #f8fafc; }
+
+    /* Thanh hiển thị điểm số, thời gian và nút Bắt đầu */
+    .control-panel {
+      width: 600px;
+      max-width: 100%;
+      background: #1e293b;
+      border: 2px solid #334155;
+      border-radius: 10px;
+      padding: 12px 20px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .stat-box { font-size: 1.1rem; font-weight: 600; }
+    .stat-box span { color: #facc15; font-size: 1.3rem; }
+
+    #start-btn {
+      background: #22c55e;
+      color: #052e16;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    #start-btn:hover { background: #4ade80; }
+    #start-btn:active { transform: scale(0.96); }
+    #start-btn:disabled {
+      background: #64748b;
+      color: #cbd5e1;
+      cursor: not-allowed;
+    }
+
+    /* Khu vực chơi #arena: kích thước 600px x 400px, định vị tuyệt đối/tương đối */
+    #arena {
+      width: 600px;
+      height: 400px;
+      position: relative;
+      background: radial-gradient(circle at center, #1e3a8a, #0f172a);
+      border: 3px solid #38bdf8;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* Mục tiêu hình tròn nhỏ định vị tuyệt đối trong #arena */
+    #target {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #ff6b6b, #dc2626);
+      border: 3px solid #ffffff;
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.9);
+      position: absolute;
+      top: 0;
+      left: 0;
+      display: none;
+      cursor: crosshair;
+      transition: transform 0.08s;
+    }
+    #target:active { transform: scale(0.9); }
+
+    /* Màn hình thông báo kết quả khi hết 30 giây */
+    #result-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.88);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px;
+    }
+    #result-overlay h2 { color: #facc15; font-size: 1.8rem; margin-bottom: 10px; }
+    #result-overlay p { font-size: 1.2rem; margin-bottom: 18px; }
+  </style>
+</head>
+<body>
+
+  <div class="student-info">
+    <strong>Họ và tên:</strong> Cao Thị Quỳnh Hương &nbsp;|&nbsp; <strong>MSSV:</strong> 241A010219
+  </div>
+
+  <h1>🎯 Game Kiểm Tra Tốc Độ Phản Xạ</h1>
+
+  <div class="control-panel">
+    <div class="stat-box">Điểm số: <span id="score">0</span></div>
+    <div class="stat-box">Thời gian: <span id="time-left">30</span>s</div>
+    <button id="start-btn">Bắt đầu trò chơi</button>
+  </div>
+
+  <!-- Khu vực chơi 600px x 400px -->
+  <div id="arena">
+    <div id="target"></div>
+
+    <!-- Lớp phủ khóa thao tác và hiện tổng điểm khi hết giờ -->
+    <div id="result-overlay">
+      <h2>⏰ Hết giờ!</h2>
+      <p id="final-score-text">Tổng điểm của bạn: 0</p>
+      <button id="restart-btn" style="background:#38bdf8;color:#0f172a;border:none;padding:10px 22px;border-radius:8px;font-weight:700;font-size:1rem;cursor:pointer;">Chơi lại</button>
+    </div>
+  </div>
+
+  <script>
+    const arena = document.getElementById("arena");
+    const target = document.getElementById("target");
+    const scoreEl = document.getElementById("score");
+    const timeEl = document.getElementById("time-left");
+    const startBtn = document.getElementById("start-btn");
+    const restartBtn = document.getElementById("restart-btn");
+    const resultOverlay = document.getElementById("result-overlay");
+    const finalScoreText = document.getElementById("final-score-text");
+
+    let score = 0;
+    let timeLeft = 30;
+    let isPlaying = false;
+    let countdownTimer = null;
+    let moveTimer = null;
+
+    // Hàm sinh tọa độ ngẫu nhiên top và left bên trong #arena (600x400)
+    function moveTargetRandomly() {
+      const targetSize = 44;
+      const maxLeft = arena.clientWidth - targetSize;
+      const maxTop = arena.clientHeight - targetSize;
+
+      const randomLeft = Math.floor(Math.random() * maxLeft);
+      const randomTop = Math.floor(Math.random() * maxTop);
+
+      target.style.left = randomLeft + "px";
+      target.style.top = randomTop + "px";
+    }
+
+    // Đặt lại bộ đếm tự đổi vị trí mỗi 1 giây
+    function resetAutoMoveInterval() {
+      clearInterval(moveTimer);
+      moveTimer = setInterval(() => {
+        if (isPlaying) {
+          moveTargetRandomly();
+        }
+      }, 1000);
+    }
+
+    // Bắt đầu trò chơi
+    function startGame() {
+      score = 0;
+      timeLeft = 30;
+      isPlaying = true;
+
+      scoreEl.textContent = score;
+      timeEl.textContent = timeLeft;
+      startBtn.disabled = true;
+      resultOverlay.style.display = "none";
+
+      target.style.display = "block";
+      moveTargetRandomly();
+      resetAutoMoveInterval();
+
+      // Đếm ngược mỗi 1 giây
+      clearInterval(countdownTimer);
+      countdownTimer = setInterval(() => {
+        timeLeft--;
+        timeEl.textContent = timeLeft;
+
+        if (timeLeft <= 0) {
+          endGame();
+        }
+      }, 1000);
+    }
+
+    // Kết thúc trò chơi: khóa toàn bộ thao tác & hiển thị tổng điểm
+    function endGame() {
+      isPlaying = false;
+      clearInterval(countdownTimer);
+      clearInterval(moveTimer);
+
+      target.style.display = "none";
+      startBtn.disabled = false;
+
+      finalScoreText.textContent = `Tổng số điểm đạt được: ${score} điểm`;
+      resultOverlay.style.display = "flex";
+    }
+
+    // Sự kiện click trúng mục tiêu
+    target.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!isPlaying) return;
+
+      score++;
+      scoreEl.textContent = score;
+
+      // Đổi vị trí ngay lập tức và đặt lại chu kỳ 1 giây
+      moveTargetRandomly();
+      resetAutoMoveInterval();
+    });
+
+    startBtn.addEventListener("click", startGame);
+    restartBtn.addEventListener("click", startGame);
+  </script>
+</body>
+</html>
